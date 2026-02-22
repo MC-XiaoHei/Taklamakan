@@ -82,7 +82,7 @@ class GraveRepository(private val dataFile: File) {
                 gravesByPlayer[playerId] = data
                 gravesByLocation[location] = playerId
             }
-        } catch (ignored: Exception) {
+        } catch (_: Exception) {
         }
     }
 

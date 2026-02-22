@@ -3,6 +3,7 @@ package cn.xor7.xiaohei.taklamakan
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.GameMode
+import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -13,9 +14,21 @@ class PlayerJoinListener(private val offlineRepository: OfflineRevivalRepository
     @EventHandler
     fun onPlayerJoin(event: PlayerJoinEvent) {
         val player = event.player
-        val reviveData = offlineRepository.consumeAndSave(player.uniqueId) ?: return
 
+        if (isNewPlayer(player)) {
+            teleportToDesertStartingPoint(player)
+            return
+        }
+
+        val reviveData = offlineRepository.consumeAndSave(player.uniqueId) ?: return
         applyRevivalEffects(player, reviveData)
+    }
+
+    private fun isNewPlayer(player: Player): Boolean = !player.hasPlayedBefore()
+
+    private fun teleportToDesertStartingPoint(player: Player) {
+        val spawnLocation = Location(player.world, 0.5, 68.0, 62000.5)
+        player.teleport(spawnLocation)
     }
 
     private fun applyRevivalEffects(player: Player, data: OfflineReviveData) {

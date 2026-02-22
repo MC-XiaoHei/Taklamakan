@@ -37,17 +37,57 @@ class DeathListener(
     @EventHandler
     fun onPlayerRespawn(event: PlayerRespawnEvent) {
         val player = event.player
-        val grave = graveRepository.findGraveByPlayer(player.uniqueId)
+        val grave = graveRepository.findGraveByPlayer(player.uniqueId) ?: return
 
-        if (grave != null) {
-            event.respawnLocation = calculateRespawnLocation(grave.location)
-            enforceSpectatorMode(player)
-            return
-        }
+        event.respawnLocation = grave.location.clone().add(0.5, 0.0, 0.5)
+        ensureSpectatorAfterRespawn(player)
+    }
 
-        if (isPermanentlyDead(player)) {
-            enforceSpectatorMode(player)
+    private fun createCorpse(player: Player) {
+        val safeLocation = findSafeAirLocation(player.location)
+
+        spawnPlayerHead(safeLocation, player)
+        val label = spawnHologram(safeLocation, player)
+
+        graveRepository.addGrave(player.uniqueId, safeLocation.block.location, label)
+
+        player.teleport(safeLocation)
+        player.gameMode = GameMode.SPECTATOR
+    }
+
+    private fun findSafeAirLocation(origin: Location): Location {
+        var current = origin.block
+        while (current.type != Material.AIR && current.y < current.world.maxHeight) {
+            current = current.getRelative(0, 1, 0)
         }
+        return current.location
+    }
+
+    private fun spawnPlayerHead(location: Location, owner: Player) {
+        val block = location.block
+        block.type = Material.PLAYER_HEAD
+        val skull = block.state as Skull
+        @Suppress("DEPRECATION")
+        skull.setOwningPlayer(owner)
+        skull.update()
+    }
+
+    private fun spawnHologram(location: Location, owner: Player): TextDisplay {
+        val labelLoc = location.block.location.add(0.5, 1.25, 0.5)
+        val label = labelLoc.world.spawnEntity(labelLoc, EntityType.TEXT_DISPLAY) as TextDisplay
+
+        label.text(createInitialLabel(owner.name))
+        label.billboard = Display.Billboard.CENTER
+        label.isDefaultBackground = false
+        label.brightness = Display.Brightness(15, 15)
+        return label
+    }
+
+    private fun createInitialLabel(playerName: String): Component {
+        return Component.text("☠ ", NamedTextColor.DARK_RED)
+            .append(Component.text("$playerName 的残躯", NamedTextColor.GRAY))
+            .append(Component.newline())
+            .append(Component.text("长按右键头颅 10秒 开启灵魂转移", NamedTextColor.YELLOW))
     }
 
     private fun applyDeathPenalty(player: Player) {
@@ -58,59 +98,15 @@ class DeathListener(
         if (newMax > 0) player.sendMessage(Constants.MSG_DEATH_PENALTY)
     }
 
-    private fun isPermanentlyDead(player: Player): Boolean {
-        val maxHealthAttr = player.getAttribute(Attribute.MAX_HEALTH) ?: return true
-        return maxHealthAttr.baseValue <= 0
-    }
+    private fun isPermanentlyDead(player: Player): Boolean =
+        (player.getAttribute(Attribute.MAX_HEALTH)?.baseValue ?: 0.0) <= 0
 
     private fun handlePermanentDeath(player: Player) {
         player.gameMode = GameMode.SPECTATOR
         player.sendMessage(Constants.MSG_PERMA_DEATH)
     }
 
-    private fun createCorpse(player: Player) {
-        val deathLoc = player.location
-        spawnPlayerHead(deathLoc, player)
-        val label = spawnHologram(deathLoc, player)
-
-        graveRepository.addGrave(player.uniqueId, deathLoc.block.location, label)
-
-        player.gameMode = GameMode.SPECTATOR
-        player.teleport(deathLoc)
-    }
-
-    private fun spawnPlayerHead(location: Location, owner: Player) {
-        val block = location.block
-        block.type = Material.PLAYER_HEAD
-        val skull = block.state as Skull
-
-        @Suppress("DEPRECATION")
-        skull.setOwningPlayer(owner)
-        skull.update()
-    }
-
-    private fun spawnHologram(location: Location, owner: Player): TextDisplay {
-        val textLoc = location.clone().add(0.5, 1.2, 0.5)
-        val label = textLoc.world.spawnEntity(textLoc, EntityType.TEXT_DISPLAY) as TextDisplay
-
-        label.text(getInitialLabelComponent(owner.name))
-        label.billboard = Display.Billboard.CENTER
-        label.isDefaultBackground = false
-        return label
-    }
-
-    private fun getInitialLabelComponent(playerName: String): Component {
-        return Component.text("☠ ", NamedTextColor.DARK_RED)
-            .append(Component.text("$playerName 的残躯", NamedTextColor.GRAY))
-            .append(Component.newline())
-            .append(Component.text("长按右键头颅 10秒 开启灵魂转移", NamedTextColor.YELLOW))
-    }
-
-    private fun calculateRespawnLocation(graveLocation: Location): Location {
-        return graveLocation.clone().add(0.5, 0.0, 0.5)
-    }
-
-    private fun enforceSpectatorMode(player: Player) {
+    private fun ensureSpectatorAfterRespawn(player: Player) {
         plugin.server.scheduler.runTask(plugin, Runnable {
             player.gameMode = GameMode.SPECTATOR
         })

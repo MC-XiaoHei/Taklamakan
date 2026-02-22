@@ -1,5 +1,6 @@
 @file:Suppress("SpellCheckingInspection")
 
+import org.leavesmc.LeavesPluginJson.Load
 import org.leavesmc.leavesPluginJson
 import xyz.jpenilla.runtask.service.DownloadsAPIService
 import xyz.jpenilla.runtask.service.DownloadsAPIService.Companion.registerIfAbsent
@@ -22,6 +23,7 @@ val pluginJson = leavesPluginJson {
     description = "神秘赛博徒步"
     foliaSupported = false
     apiVersion = libs.versions.leavesApi.extractMCVersion()
+    dependencies.server("voicechat", required = true, load = Load.BEFORE, joinClasspath = true)
 }
 
 val runServerPlugins = runPaper.downloadPluginsSpec {
@@ -41,6 +43,9 @@ repositories {
     maven("https://repo.leavesmc.org/snapshots/") {
         name = "leavesmc-snapshots"
     }
+    maven("https://maven.maxhenkel.de/repository/public") {
+        name = "svc-repo"
+    }
     mavenLocal()
 }
 
@@ -55,6 +60,7 @@ sourceSets {
 dependencies {
     apply `plugin dependencies`@{
         implementation(kotlin("stdlib-jdk8"))
+        compileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.0")
     }
 
     apply `api and server source`@{

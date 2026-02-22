@@ -20,7 +20,6 @@ class DeathListener(
     private val plugin: TaklamakanPlugin,
     private val graveRepository: GraveRepository
 ) : Listener {
-
     @EventHandler
     fun onPlayerDeath(event: PlayerDeathEvent) {
         val player = event.entity
